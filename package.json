@@ -1,8 +1,8 @@
 {
-  "name": "magic-fill",
-  "displayName": "Magic fill",
+  "name": "phil.ai",
+  "displayName": "Phil AI",
   "version": "0.0.1",
-  "description": "Magically Fill Form using AI",
+  "description": "Magic AI Cursor",
   "author": "Paras Sharma",
   "scripts": {
     "dev": "plasmo dev",
@@ -10,6 +10,7 @@
     "test": "plasmo test"
   },
   "dependencies": {
+    "@plasmohq/messaging": "^0.6.0",
     "plasmo": "0.84.0",
     "react": "18.2.0",
     "react-dom": "18.2.0"
@@ -20,12 +21,18 @@
     "@types/node": "20.9.0",
     "@types/react": "18.2.37",
     "@types/react-dom": "18.2.15",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
     "prettier": "3.0.3",
+    "tailwindcss": "^3.3.6",
     "typescript": "5.2.2"
   },
   "manifest": {
     "host_permissions": [
       "https://*/*"
+    ],
+    "permissions": [
+      "activeTab"
     ]
   }
 }
