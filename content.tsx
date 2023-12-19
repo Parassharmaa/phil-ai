@@ -1,4 +1,5 @@
 import cssText from "data-text:~style.css"
+import OpenAI from "openai"
 import type { PlasmoCreateShadowRoot, PlasmoCSConfig } from "plasmo"
 import { useEffect, useRef, useState } from "react"
 import CursorImage from "react:~assets/cursor.svg"
@@ -6,11 +7,18 @@ import CursorImage from "react:~assets/cursor.svg"
 import { sendToBackground } from "@plasmohq/messaging"
 import { useMessage } from "@plasmohq/messaging/hook"
 
+import ControlCenter from "~components/controlCenter"
 import Cursor from "~components/cursor"
 import { isInteractive } from "~utils"
+import { browserOperator } from "~utils/prompts"
+
+const openai = new OpenAI({
+  apiKey: process.env.PLASMO_PUBLIC_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+})
 
 export const config: PlasmoCSConfig = {
-  all_frames: true
+  all_frames: false
 }
 
 export const getStyle = () => {
@@ -19,14 +27,93 @@ export const getStyle = () => {
   return style
 }
 
-export const createShadowRoot: PlasmoCreateShadowRoot = (shadowHost) =>
-  shadowHost.attachShadow({ mode: "open" })
-
 const AutoFill = () => {
-  const phil = async () => {
+  const [cursPos, setCursPos] = useState({
+    x: null,
+    y: null
+  })
+  const startTask = async (task) => {
     const data = await sendToBackground({
       name: "captureTab"
     })
+
+    // resize the data image to 256x256
+    const canvas = document.createElement("canvas")
+    const ctx = canvas.getContext("2d")
+    let img = new Image()
+    img.src = data
+    img.onload = async () => {
+      // scale down the res based on acutal window size
+      const width = window.innerWidth / 2
+      const height = window.innerHeight / 2
+
+      canvas.width = width
+      canvas.height = height
+
+      ctx.drawImage(img, 0, 0, width, height)
+      const resizedImage = canvas.toDataURL()
+
+      const res = await openai.chat.completions.create({
+        model: "gpt-4-vision-preview",
+        max_tokens: 3000,
+        messages: [
+          {
+            role: "user",
+
+            content: [
+              {
+                type: "text",
+                text: browserOperator({
+                  objective: task,
+                  actions: ""
+                })
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: resizedImage,
+                  detail: "low"
+                }
+              }
+            ]
+          }
+        ]
+      })
+
+      const action = res.choices[0].message.content
+
+      console.log(action)
+
+      if (action.startsWith("GOTO")) {
+        const description = JSON.parse(action.split("GOTO")[1].trim())
+
+        const { x, y } = description
+
+        const windowX = window.innerWidth * (parseFloat(x) / 100)
+
+        const windowY = window.innerHeight * (parseFloat(y) / 100)
+
+        console.log(windowX, windowY)
+
+        setCursPos({
+          x: windowX,
+          y: windowY
+        })
+      } else if (action.startsWith("TYPE")) {
+        const description = JSON.parse(action.split("TYPE")[1].trim())
+
+        const { text } = description
+
+        const el = document.elementFromPoint(
+          cursPos.x,
+          cursPos.y
+        ) as HTMLInputElement
+
+        if (el) {
+          simulateTyping(el, text)
+        }
+      }
+    }
 
     // send to open ai and get actions
 
@@ -38,8 +125,8 @@ const AutoFill = () => {
   }
 
   useMessage<string, string>(async (req, res) => {
-    if (req.name === "request-phil") {
-      await phil()
+    if (req.name === "go") {
+      await startTask(req.body)
     }
   })
 
@@ -111,45 +198,9 @@ const AutoFill = () => {
     element.dispatchEvent(changeEvent)
   }
 
-  const [cursPos, setCursPos] = useState({
-    x: 0,
-    y: 0
-  })
-
-  // useEffect(() => {
-  //   const onMouseMove = (e: MouseEvent) => {
-  //     const { clientX, clientY } = e
-  //     setCursPos({
-  //       x: clientX,
-  //       y: clientY
-  //     })
-  //   }
-  //   window.addEventListener("mousemove", onMouseMove)
-
-  //   // animate the position of the cursor
-
-  //   return () => {
-  //     window.removeEventListener("mousemove", onMouseMove)
-  //   }
-  // }, [cursPos])
-
-  useEffect(() => {
-    const el = document.elementFromPoint(
-      cursPos.x,
-      cursPos.y - 12
-    ) as HTMLElement
-
-    // hide cursor for el
-    if (el) {
-      // simulate mouse hover for el if it is interactive
-    }
-  }, [cursPos])
-
-  // randomly move the cursor around
-
   return (
     <div>
-      <Cursor />
+      <Cursor x={cursPos.x} y={cursPos.y} />
     </div>
   )
 }

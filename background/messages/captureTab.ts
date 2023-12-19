@@ -9,7 +9,9 @@ const handler: PlasmoMessaging.MessageHandler<
   RequestResponse
 > = async (req, res) => {
   //   capture tab
-  const tab = await chrome.tabs.captureVisibleTab()
+  const tab = await chrome.tabs.captureVisibleTab({
+    format: "png"
+  })
 
   res.send(tab)
 }
