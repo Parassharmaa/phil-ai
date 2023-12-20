@@ -27,6 +27,8 @@ export const getStyle = () => {
   return style
 }
 
+const divisions = 20
+
 const AutoFill = () => {
   const [cursPos, setCursPos] = useState({
     x: null,
@@ -44,14 +46,58 @@ const AutoFill = () => {
     img.src = data
     img.onload = async () => {
       // scale down the res based on acutal window size
-      const width = window.innerWidth / 2
-      const height = window.innerHeight / 2
+      const width = window.innerWidth / 1.5
+      const height = window.innerHeight / 1.5
 
       canvas.width = width
       canvas.height = height
 
       ctx.drawImage(img, 0, 0, width, height)
       const resizedImage = canvas.toDataURL()
+
+      // draw grid on the image
+      ctx.strokeStyle = "gray"
+      ctx.lineWidth = 0.5
+
+      for (let i = 0; i < width; i += width / divisions) {
+        ctx.beginPath()
+        ctx.moveTo(i, 0)
+        ctx.lineTo(i, height)
+        ctx.stroke()
+      }
+
+      for (let i = 0; i < height; i += height / divisions) {
+        ctx.beginPath()
+        ctx.moveTo(0, i)
+        ctx.lineTo(width, i)
+        ctx.stroke()
+      }
+
+      // add text label to each grid cell
+      for (let i = 0; i < divisions * divisions; i++) {
+        const x = (i % divisions) * (width / divisions)
+        const y = Math.floor(i / divisions) * (height / divisions)
+
+        ctx.font = "8px Arial"
+        ctx.fillStyle = "gray"
+        ctx.fillText(i.toString(), x + 5, y + 10)
+      }
+      // // get canvas data
+      const data = canvas.toDataURL()
+
+      // download the image using hidden anchor tag
+      // const a = document.createElement("a")
+      // a.href = data
+      // a.download = "test.png"
+      // a.click()
+      // // hide the anchor tag
+      // a.style.visibility = "hidden"
+
+      // // append the image to the dom
+      // const gridImg = document.createElement("img")
+      // gridImg.src = data
+
+      // document.body.appendChild(gridImg)
 
       const res = await openai.chat.completions.create({
         model: "gpt-4-vision-preview",
@@ -71,7 +117,7 @@ const AutoFill = () => {
               {
                 type: "image_url",
                 image_url: {
-                  url: resizedImage,
+                  url: data,
                   detail: "low"
                 }
               }
@@ -84,40 +130,57 @@ const AutoFill = () => {
 
       console.log(action)
 
-      if (action.startsWith("GOTO")) {
-        const description = JSON.parse(action.split("GOTO")[1].trim())
+      let targetX = null
+      let targetY = null
+      if (action.startsWith("CLICK") || action.startsWith("TYPE")) {
+        let content = { grid: null, description: null }
+        if (action.startsWith("CLICK")) {
+          content = JSON.parse(action.split("CLICK")[1].trim())
+        } else if (action.startsWith("TYPE")) {
+          content = JSON.parse(action.split("TYPE")[1].trim())
+        }
 
-        const { x, y } = description
+        if (content.grid) {
+          const { grid } = content
 
-        const windowX = window.innerWidth * (parseFloat(x) / 100)
+          // convert the grid number to x, y
+          targetX = (grid % divisions) * (width / divisions)
+          targetY = Math.floor(grid / divisions) * (height / divisions)
 
-        const windowY = window.innerHeight * (parseFloat(y) / 100)
+          console.log(targetX, targetY)
 
-        console.log(windowX, windowY)
+          setCursPos({
+            x: targetX,
+            y: targetY
+          })
+        }
+        if (!content.description) {
+          return
+        }
 
-        setCursPos({
-          x: windowX,
-          y: windowY
-        })
-      } else if (action.startsWith("TYPE")) {
-        const description = JSON.parse(action.split("TYPE")[1].trim())
+        if (action.startsWith("CLICK")) {
+          // click on the element
+          const element = document.elementFromPoint(
+            targetX,
+            targetY
+          ) as HTMLElement
 
-        const { text } = description
+          if (isInteractive(element)) {
+            element.click()
+          }
+        } else {
+          // type on the element
+          const element = document.elementFromPoint(
+            targetX,
+            targetY
+          ) as HTMLElement
 
-        const el = document.elementFromPoint(
-          cursPos.x,
-          cursPos.y
-        ) as HTMLInputElement
-
-        if (el) {
-          simulateTyping(el, text)
+          if (isInteractive(element)) {
+            simulateTyping(element, content.description)
+          }
         }
       }
     }
-
-    // send to open ai and get actions
-
-    // perform actions on the dom
 
     // scroll down and recursivelly call this function
 
