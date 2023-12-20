@@ -1,16 +1,15 @@
 import cssText from "data-text:~style.css"
 import OpenAI from "openai"
-import type { PlasmoCreateShadowRoot, PlasmoCSConfig } from "plasmo"
-import { useEffect, useRef, useState } from "react"
-import CursorImage from "react:~assets/cursor.svg"
+import type { PlasmoCSConfig } from "plasmo"
+import { useState } from "react"
+import { parse, stringify } from "yaml"
 
 import { sendToBackground } from "@plasmohq/messaging"
 import { useMessage } from "@plasmohq/messaging/hook"
 
-import ControlCenter from "~components/controlCenter"
 import Cursor from "~components/cursor"
-import { isInteractive } from "~utils"
-import { browserOperator } from "~utils/prompts"
+import { getSimplifiedDom, isInteractive, simulateTyping } from "~utils"
+import { browserOperator, magicFillFormInDom } from "~utils/prompts"
 
 const openai = new OpenAI({
   apiKey: process.env.PLASMO_PUBLIC_OPENAI_API_KEY,
@@ -181,85 +180,76 @@ const AutoFill = () => {
         }
       }
     }
+  }
 
-    // scroll down and recursivelly call this function
+  const magicFillForm = async (body: String) => {
+    // get html content
 
-    // if cannot scroll down, exit
+    const dom = getSimplifiedDom()
+
+    const stream = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo-16k",
+      stream: true,
+      max_tokens: 3000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: magicFillFormInDom(dom.outerHTML, body)
+            }
+          ]
+        }
+      ]
+    })
+
+    let res = ""
+
+    for await (const message of stream) {
+      const delta = message.choices[0].delta.content || ""
+
+      if (delta) {
+        res += delta
+      }
+    }
+
+    console.log(res)
+
+    const actions = parse(res)
+
+    // iterate over the action and perform the action
+    for (const action of actions) {
+      const id = action["data-magic-id"]
+
+      // get the element
+      const element = document.querySelector(`[data-magic-id="${id}"]`)
+
+      if (!element) {
+        continue
+      }
+
+      // click on the element
+      if (element) {
+        ;(element as HTMLElement).click()
+      }
+
+      if (action.response) {
+        // type on the element
+        simulateTyping(element, action.response)
+      }
+    }
   }
 
   useMessage<string, string>(async (req, res) => {
     if (req.name === "go") {
       await startTask(req.body)
     }
+
+    if (req.name === "magicFill") {
+      magicFillForm(req.body)
+    }
   })
-
-  const simulateBackspace = (element) => {
-    // Create a 'keydown' event for the backspace key
-    var backspaceEvent = new KeyboardEvent("keydown", {
-      bubbles: true,
-      cancelable: true,
-      key: "Backspace",
-      code: "Backspace",
-      keyCode: 8
-    })
-
-    // Dispatch the event
-    element.dispatchEvent(backspaceEvent)
-
-    // Manually remove the last character from the input field's value
-    element.value = element.value.substring(0, element.value.length - 1)
-
-    // Trigger change event after backspace is simulated
-    var changeEvent = new Event("change")
-    element.dispatchEvent(changeEvent)
-  }
-
-  const simulateTyping = (element, text) => {
-    text.split("").forEach(function (char) {
-      // Create a 'keydown' event
-      var keydownEvent = new KeyboardEvent("keydown", {
-        key: char,
-        keyCode: char.charCodeAt(0),
-        code: char.charCodeAt(0),
-        which: char.charCodeAt(0),
-        shiftKey: false,
-        ctrlKey: false,
-        metaKey: false
-      })
-
-      // Create a 'keypress' event
-      var keypressEvent = new KeyboardEvent("keypress", {
-        key: char,
-        keyCode: char.charCodeAt(0),
-        code: char.charCodeAt(0),
-        which: char.charCodeAt(0),
-        shiftKey: false,
-        ctrlKey: false,
-        metaKey: false
-      })
-
-      // Create a 'keyup' event
-      var keyupEvent = new KeyboardEvent("keyup", {
-        key: char,
-        keyCode: char.charCodeAt(0),
-        code: char.charCodeAt(0),
-        which: char.charCodeAt(0),
-        shiftKey: false,
-        ctrlKey: false,
-        metaKey: false
-      })
-
-      // Dispatch the events
-      element.dispatchEvent(keydownEvent)
-      element.value += char // Directly set the value of the element
-      element.dispatchEvent(keypressEvent)
-      element.dispatchEvent(keyupEvent)
-    })
-
-    // Trigger change event after typing is complete
-    var changeEvent = new Event("change")
-    element.dispatchEvent(changeEvent)
-  }
 
   return (
     <div>

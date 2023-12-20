@@ -41,3 +41,28 @@ Previous Actions: ${actions}
 
 Objective: ${objective}
 `
+
+export const magicFillFormInDom = (dom: String, context: String) => `
+Analyze the HTML markup of a webpage given below. Your task is to identify all form elements within this markup, focusing specifically on input fields such as text boxes, radio buttons, checkboxes, and select options. 
+
+Exclude buttons, links, and other non-input elements. Use the context provided to form your responses to each input field.
+
+Once you have identified these input elements, respond by filling out these fields with appropriate answers, based on the context or labels provided in the HTML markup.
+
+List each input element along with a 'data-magic-id' attribute value. Provide a real, context-appropriate answer for each input field. Here is an example format for your response:
+
+Format your response in YAML, following this structure:
+
+- data-magic-id: [ID value]
+  label: <question asked on the label for this input field>
+  response: "Response based on the question asked in the form for this input field"
+
+The response should be accurate and contextually relevant, reflecting the information or intent behind each input field in the provided HTML markup. Do not answer the questions in repetitive ways.
+
+Do not include any input fields that are not in the provided HTML markup. Only respond with YAML only, do not include any other text in your response. Do not reply with any note.
+
+DOM: ${dom}
+
+Context: ${context}
+
+`
