@@ -168,7 +168,6 @@ export const simulateBackspace = (element) => {
 }
 
 export const simulateTyping = (element, text) => {
-  console.log("typing", text)
   text?.split("").forEach((char) => {
     // Create a 'keydown' event
     var event = new KeyboardEvent("keydown", { key: char, bubbles: true })

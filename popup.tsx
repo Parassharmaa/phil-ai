@@ -46,7 +46,10 @@ function IndexPopup() {
           <div>
             <MagicFill
               onDone={(body) => {
-                sendToContentScript({ name: "magicFill", body })
+                sendToContentScript({ name: "magicFillStatus", body })
+              }}
+              onContextSet={(body) => {
+                sendToContentScript({ name: "magicFillContext", body })
               }}
             />
           </div>

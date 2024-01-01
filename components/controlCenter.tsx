@@ -17,11 +17,14 @@ const ControlCenter = ({ onGo }) => {
           onClick={() => {
             onGo(data)
           }}
+          disabled
           className="items-center rounded-full text-white justify-center text-sm font-medium disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-blue-500 bg-blue-400 h-10 px-4 py-2"
           type="submit">
           Go
         </button>
       </div>
+
+      <div className="my-2">Work in progress. Please check back later.</div>
     </div>
   )
 }

@@ -1,11 +1,12 @@
 import cssText from "data-text:~style.css"
 import OpenAI from "openai"
-import type { PlasmoCSConfig } from "plasmo"
-import { useState } from "react"
+import type { PlasmoCreateShadowRoot, PlasmoCSConfig } from "plasmo"
+import { useEffect, useState } from "react"
 import { parse, stringify } from "yaml"
 
 import { sendToBackground } from "@plasmohq/messaging"
 import { useMessage } from "@plasmohq/messaging/hook"
+import { useStorage } from "@plasmohq/storage/hook"
 
 import Cursor from "~components/cursor"
 import { getSimplifiedDom, isInteractive, simulateTyping } from "~utils"
@@ -33,6 +34,9 @@ const AutoFill = () => {
     x: null,
     y: null
   })
+
+  const [isAnalysing, setIsAnalysing] = useState(false)
+
   const startTask = async (task) => {
     const data = await sendToBackground({
       name: "captureTab"
@@ -182,63 +186,84 @@ const AutoFill = () => {
     }
   }
 
-  const magicFillForm = async (body: String) => {
-    // get html content
+  const magicAnalyse = async () => {
+    setIsAnalysing(true)
 
-    const dom = getSimplifiedDom()
+    try {
+      const dom = getSimplifiedDom()
 
-    const stream = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo-16k",
-      stream: true,
-      max_tokens: 3000,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: magicFillFormInDom(dom.outerHTML, body)
-            }
-          ]
+      const stream = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo-16k",
+        stream: true,
+        temperature: 0,
+        max_tokens: 3000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: magicFillFormInDom(dom.outerHTML)
+              }
+            ]
+          }
+        ]
+      })
+
+      let res = ""
+
+      for await (const message of stream) {
+        const delta = message.choices[0].delta.content || ""
+
+        if (delta) {
+          res += delta
         }
-      ]
-    })
-
-    let res = ""
-
-    for await (const message of stream) {
-      const delta = message.choices[0].delta.content || ""
-
-      if (delta) {
-        res += delta
       }
+
+      // parse
+      const parsedRes = parse(res)
+
+      // for all the keys with data-magic attribute, append a div with an icon
+      parsedRes.forEach((item) => {
+        const element = document.querySelector(
+          `[data-magic-id="${item["data-magic-id"]}"]`
+        )
+
+        // check if the element is input or textarea and not hidden or submit
+        if (
+          element &&
+          (element.tagName === "INPUT" || element.tagName === "TEXTAREA") &&
+          element.getAttribute("type") !== "hidden" &&
+          element.getAttribute("type") !== "submit" &&
+          element.getAttribute("type") !== "checkbox" &&
+          element.getAttribute("type") !== "radio" &&
+          element.getAttribute("type") !== "button" &&
+          element.getAttribute("type") !== "image" &&
+          element.getAttribute("type") !== "reset" &&
+          element.getAttribute("type") !== "file" &&
+          element.getAttribute("type") !== "range" &&
+          element.getAttribute("type") !== "color" &&
+          element.getAttribute("type") !== "date"
+        ) {
+          if (element) {
+            const magicElement = document.createElement("magic-fill")
+
+            // set the data-magic-id attribute
+            magicElement.setAttribute("dataMagicId", item["data-magic-id"])
+
+            // set the data-magic-label attribute
+            magicElement.setAttribute("dataMagicLabel", item["label"])
+
+            // append after the element
+            element.before(magicElement)
+          }
+        }
+      })
+    } catch (e) {
+      console.log(e)
     }
 
-    console.log(res)
-
-    const actions = parse(res)
-
-    // iterate over the action and perform the action
-    for (const action of actions) {
-      const id = action["data-magic-id"]
-
-      // get the element
-      const element = document.querySelector(`[data-magic-id="${id}"]`)
-
-      if (!element) {
-        continue
-      }
-
-      // click on the element
-      if (element) {
-        ;(element as HTMLElement).click()
-      }
-
-      if (action.response) {
-        // type on the element
-        simulateTyping(element, action.response)
-      }
-    }
+    setIsAnalysing(false)
   }
 
   useMessage<string, string>(async (req, res) => {
@@ -246,13 +271,33 @@ const AutoFill = () => {
       await startTask(req.body)
     }
 
-    if (req.name === "magicFill") {
-      magicFillForm(req.body)
+    if (req.name === "magicFillStatus") {
+      localStorage.setItem("magicFillStatus", req.body)
+    }
+
+    if (req.name === "magicFillContext") {
+      localStorage.setItem("magicFillContext", req.body)
     }
   })
 
+  const magicFillStatus = localStorage.getItem("magicFillStatus")
+
+  const magicFillContext = localStorage.getItem("magicFillContext")
+
+  if (magicFillStatus === "off") {
+    return null
+  }
+
   return (
     <div>
+      {/* add button to trigger analyse  */}
+      <button
+        className="fixed top-0 left-0 p-2 m-2 bg-blue-500 text-white rounded"
+        onClick={() => {
+          magicAnalyse()
+        }}>
+        {isAnalysing ? "Analysing..." : `Analyse`}
+      </button>
       <Cursor x={cursPos.x} y={cursPos.y} />
     </div>
   )
