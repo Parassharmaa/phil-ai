@@ -1,12 +1,11 @@
 import cssText from "data-text:~style.css"
 import OpenAI from "openai"
-import type { PlasmoCreateShadowRoot, PlasmoCSConfig } from "plasmo"
-import { useEffect, useState } from "react"
-import { parse, stringify } from "yaml"
+import type { PlasmoCSConfig } from "plasmo"
+import { useState } from "react"
+import { parse } from "yaml"
 
 import { sendToBackground } from "@plasmohq/messaging"
 import { useMessage } from "@plasmohq/messaging/hook"
-import { useStorage } from "@plasmohq/storage/hook"
 
 import Cursor from "~components/cursor"
 import { getSimplifiedDom, isInteractive, simulateTyping } from "~utils"
@@ -195,7 +194,7 @@ const AutoFill = () => {
       const stream = await openai.chat.completions.create({
         model: "gpt-3.5-turbo-16k",
         stream: true,
-        temperature: 0,
+        temperature: 0.7,
         max_tokens: 3000,
         messages: [
           {

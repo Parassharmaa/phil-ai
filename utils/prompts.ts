@@ -43,7 +43,7 @@ Objective: ${objective}
 `
 
 export const magicFillFormInDom = (dom: String) => `
-Analyze the HTML markup of a webpage given below. Your task is to identify all form input/textarea elements within this markup
+Analyze the HTML markup of a webpage given below. Your task is to identify all form <input> <textarea> elements within this markup
 
 Please ignore the inputs that are disabled, submit type or hidden.
 
@@ -53,12 +53,14 @@ Once you have identified these input elements, list each input element along wit
 
 Format your response in YAML, following this structure:
 
-- data-magic-id: [ID value]
-  label: [question asked on the label for this input field, add relvant context to help the user answer the question]
+- data-magic-id: "[ID value]"
+  label: "[question asked on the label for this input field, add relvant context to help the user answer the question]"
 
 The response should be accurate and contextually relevant, reflecting the information or intent behind each input field in the provided HTML markup. Do not answer the questions in repetitive ways.
 
 Do not include any input fields that are not in the provided HTML markup. Only respond with YAML only, do not include any other text in your response. Do not reply with any note.
+
+if you are not able to identify any input field, please reply with empty YAML.
 
 DOM: ${dom}
 
